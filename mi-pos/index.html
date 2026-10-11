@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Mi POS: sistema de punto de venta con cajas registradoras, inventario y facturación para tu tienda.">
+<title>Mi POS - Punto de Venta</title>
+<style>
+  :root{--azul:#1f6feb;--azul-osc:#0b3d91;--bg:#f3f5f9;--card:#fff;--txt:#1b2430;--gris:#6b7685;--verde:#16a34a;--rojo:#dc2626;--borde:#e3e7ee}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,Segoe UI,Arial,sans-serif}
+  body{background:var(--bg);color:var(--txt);display:flex;min-height:100vh}
+  aside{width:220px;background:var(--azul-osc);color:#fff;padding:18px 12px;flex-shrink:0}
+  aside h1{font-size:20px;margin:0 8px 20px}
+  aside button{display:block;width:100%;text-align:left;background:none;border:0;color:#cfe0ff;padding:11px 12px;border-radius:8px;font-size:15px;cursor:pointer;margin-bottom:4px}
+  aside button.on,aside button:hover{background:var(--azul);color:#fff}
+  main{flex:1;padding:22px;overflow:auto}
+  h2{margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--borde);border-radius:12px;padding:16px;margin-bottom:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  input,select{padding:9px 11px;border:1px solid var(--borde);border-radius:8px;font-size:14px;background:#fff}
+  .btn{background:var(--azul);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer}
+  .btn:hover{opacity:.9}.btn.verde{background:var(--verde)}.btn.rojo{background:var(--rojo)}.btn.gris{background:#8a94a3}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--borde)}
+  th{color:var(--gris);font-weight:600;font-size:12px;text-transform:uppercase}
+  .pos{display:grid;grid-template-columns:1fr 380px;gap:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:12px}
+  .prod{background:#fff;border:1px solid var(--borde);border-radius:10px;padding:12px;cursor:pointer;text-align:center}
+  .prod:hover{border-color:var(--azul);box-shadow:0 2px 8px #1f6feb33}
+  .prod b{display:block;font-size:14px;margin-bottom:4px}
+  .prod span{color:var(--azul);font-weight:700}
+  .prod small{display:block;color:var(--gris);margin-top:3px}
+  .tot{font-size:14px;margin-top:10px}.tot div{display:flex;justify-content:space-between;padding:3px 0}
+  .tot .grande{font-size:22px;font-weight:800;border-top:2px solid var(--borde);margin-top:6px;padding-top:8px}
+  .badge{padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600}
+  .abierta{background:#dcfce7;color:#166534}.cerrada{background:#fee2e2;color:#991b1b}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .stat{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:16px}
+  .stat small{color:var(--gris)}.stat b{display:block;font-size:24px;margin-top:4px}
+  .qty button{width:26px;height:26px;border:1px solid var(--borde);background:#fff;border-radius:6px;cursor:pointer}
+  .aviso{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;padding:12px;border-radius:10px;margin-bottom:14px}
+  @media(max-width:900px){.pos{grid-template-columns:1fr}aside{width:160px}}
+
+  /* Login / Crear cuenta */
+  #auth{position:fixed;inset:0;z-index:10000;background:linear-gradient(135deg,#0b3d91,#1f6feb);display:flex;align-items:center;justify-content:center;padding:16px}
+  .authbox{background:#fff;border-radius:16px;padding:32px 28px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 50px #0005}
+  .authbox h1{text-align:center;color:var(--azul-osc)}
+  .authbox p{text-align:center;color:var(--gris)}
+  .authbox input{width:100%}
+  .authbox .btn{padding:12px;font-size:16px}
+  .authbox .err{color:var(--rojo);font-size:13px;min-height:16px;text-align:center}
+  .authbox .rec{font-size:14px;color:var(--gris);display:flex;gap:6px;align-items:center}
+  .authbox .rec input{width:auto}
+  .authbox a{color:var(--azul);font-weight:600}
+  #usr{margin-top:24px;padding-top:14px;border-top:1px solid #ffffff33;color:#cfe0ff;font-size:14px}
+  #usr div{margin:0 8px 8px}
+</style>
+</head>
+<body>
+<aside>
+  <h1>🛒 Mi POS</h1>
+  <button data-v="dashboard" class="on">📊 Panel</button>
+  <button data-v="pos">💳 Punto de venta</button>
+  <button data-v="registers">🗄️ Cajas</button>
+  <button data-v="productos">📦 Productos</button>
+  <button data-v="ventas">🧾 Ventas</button>
+  <button data-v="config">⚙️ Configuración</button>
+</aside>
+<main id="app"></main>
+
+<script>
+// ============ ESTADO ============
+const KEY = 'mi_pos_v1';
+const demo = {
+  config:{tienda:'Mi Tienda',impuesto:18,moneda:'$',cajaActual:null},
+  productos:[
+    {id:1,codigo:'1001',nombre:'Agua 500ml',precio:1.0,stock:100},
+    {id:2,codigo:'1002',nombre:'Refresco 355ml',precio:1.5,stock:80},
+    {id:3,codigo:'1003',nombre:'Pan',precio:0.5,stock:60},
+    {id:4,codigo:'1004',nombre:'Leche 1L',precio:1.8,stock:40},
+    {id:5,codigo:'1005',nombre:'Arroz 1kg',precio:1.2,stock:50}
+  ],
+  cajas:[{id:1,nombre:'Caja 1',abierta:false,apertura:0,fechaApertura:null,cajero:''}],
+  ventas:[], sigId:{prod:6,caja:2,venta:1}
+};
+let S = JSON.parse(localStorage.getItem(KEY)) || demo;
+let carrito = [];
+let vista = 'dashboard';
+const guardar = () => localStorage.setItem(KEY, JSON.stringify(S));
+const $ = s => document.querySelector(s);
+const m = n => S.config.moneda + Number(n).toFixed(2);
+const fecha = d => new Date(d).toLocaleString('es');
+
+// ============ NAVEGACIÓN ============
+document.querySelectorAll('aside button[data-v]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('aside button[data-v]').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); vista = b.dataset.v; render();
+});
+function render(){ ({dashboard,pos:vPOS,registers:vCajas,productos:vProductos,ventas:vVentas,config:vConfig})[vista](); }
+function dashboard(){
+  const hoy = new Date().toDateString();
+  const vh = S.ventas.filter(v => new Date(v.fecha).toDateString()===hoy);
+  const total = vh.reduce((a,v)=>a+v.total,0);
+  const bajos = S.productos.filter(p=>p.stock<=10);
+  $('#app').innerHTML = `<h2>Panel</h2>
+  <div class="stats">
+    <div class="stat"><small>Ventas de hoy</small><b>${m(total)}</b></div>
+    <div class="stat"><small>Transacciones hoy</small><b>${vh.length}</b></div>
+    <div class="stat"><small>Productos</small><b>${S.productos.length}</b></div>
+    <div class="stat"><small>Stock bajo (≤10)</small><b>${bajos.length}</b></div>
+  </div>
+  <div class="card" style="margin-top:16px"><h3>Cajas</h3><table><tr><th>Caja</th><th>Estado</th><th>Cajero</th></tr>
+  ${S.cajas.map(c=>`<tr><td>${c.nombre}</td><td><span class="badge ${c.abierta?'abierta':'cerrada'}">${c.abierta?'Abierta':'Cerrada'}</span></td><td>${c.cajero||'-'}</td></tr>`).join('')}</table></div>
+  ${bajos.length?`<div class="card"><h3>⚠️ Stock bajo</h3>${bajos.map(p=>`<div>${p.nombre}: <b>${p.stock}</b></div>`).join('')}</div>`:''}`;
+}
+
+// ============ CAJAS ============
+function vCajas(){
+  $('#app').innerHTML = `<h2>Cajas registradoras</h2>
+  <div class="card row"><input id="ncaja" placeholder="Nombre de la nueva caja"><button class="btn" onclick="addCaja()">+ Crear caja</button></div>
+  <div class="card"><table><tr><th>Caja</th><th>Estado</th><th>Apertura</th><th>Cajero</th><th>Acción</th></tr>
+  ${S.cajas.map(c=>`<tr><td>${c.nombre}</td>
+    <td><span class="badge ${c.abierta?'abierta':'cerrada'}">${c.abierta?'Abierta':'Cerrada'}</span></td>
+    <td>${c.abierta?m(c.apertura)+' · '+fecha(c.fechaApertura):'-'}</td><td>${c.cajero||'-'}</td>
+    <td>${c.abierta
+      ? `<button class="btn rojo" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`
+      : `<button class="btn verde" onclick="abrirCaja(${c.id})">Abrir caja</button>`}
+    ${S.cajas.length>1&&!c.abierta?`<button class="btn gris" onclick="delCaja(${c.id})">🗑</button>`:''}</td></tr>`).join('')}</table></div>`;
+}
+function addCaja(){ const n=$('#ncaja').value.trim(); if(!n)return;
+  S.cajas.push({id:S.sigId.caja++,nombre:n,abierta:false,apertura:0,fechaApertura:null,cajero:''}); guardar(); vCajas(); }
+function delCaja(id){ S.cajas=S.cajas.filter(c=>c.id!==id); guardar(); vCajas(); }
+function abrirCaja(id){
+  const cajero = prompt('Nombre del cajero:'); if(!cajero) return;
+  const monto = parseFloat(prompt('Monto inicial en efectivo:','0')); if(isNaN(monto)) return;
+  const c = S.cajas.find(c=>c.id===id);
+  Object.assign(c,{abierta:true,apertura:monto,fechaApertura:Date.now(),cajero});
+  S.config.cajaActual = id; guardar(); vCajas();
+}
+function cerrarCaja(id){
+  const c = S.cajas.find(c=>c.id===id);
+  const vs = S.ventas.filter(v=>v.cajaId===id && v.fecha>=c.fechaApertura);
+  const ef = vs.filter(v=>v.pago==='Efectivo').reduce((a,v)=>a+v.total,0);
+  const otros = vs.reduce((a,v)=>a+v.total,0) - ef;
+  if(!confirm(`CIERRE DE ${c.nombre}\n\nApertura: ${m(c.apertura)}\nVentas efectivo: ${m(ef)}\nVentas tarjeta/otros: ${m(otros)}\nTotal ventas: ${m(ef+otros)}\n\nEfectivo esperado en caja: ${m(c.apertura+ef)}\n\n¿Cerrar caja?`)) return;
+  c.abierta=false; c.cajero=''; if(S.config.cajaActual===id) S.config.cajaActual=null;
+  guardar(); vCajas();
+}
+
+// ============ PUNTO DE VENTA ============
+function vPOS(){
+  const caja = S.cajas.find(c=>c.id===S.config.cajaActual && c.abierta);
+  if(!caja){
+    const abiertas = S.cajas.filter(c=>c.abierta);
+    $('#app').innerHTML = `<h2>Punto de venta</h2><div class="aviso">No hay una caja seleccionada. ${abiertas.length?'Elige una caja abierta:':'Abre una caja en la sección <b>Cajas</b> para vender.'}</div>
+    ${abiertas.map(c=>`<button class="btn" onclick="S.config.cajaActual=${c.id};vPOS()">${c.nombre} (${c.cajero})</button>`).join(' ')}`;
+    return;
+  }
+  $('#app').innerHTML = `<h2>Punto de venta · ${caja.nombre} <small style="color:var(--gris);font-weight:400">(${caja.cajero})</small></h2>
+  <div class="pos">
+    <div class="card">
+      <input id="busq" placeholder="🔍 Buscar por nombre o escanear código..." style="width:100%" oninput="listaProd()" onkeydown="if(event.key==='Enter')escanear()">
+      <div class="grid" id="lista"></div>
+    </div>
+    <div class="card" id="cart"></div>
+  </div>`;
+  listaProd(); pintarCarrito(); $('#busq').focus();
+}
+function listaProd(){
+  const q = $('#busq').value.toLowerCase();
+  const r = S.productos.filter(p=>p.nombre.toLowerCase().includes(q)||p.codigo.includes(q));
+  $('#lista').innerHTML = r.map(p=>`<div class="prod" onclick="addCarrito(${p.id})"><b>${p.nombre}</b><span>${m(p.precio)}</span><small>Stock: ${p.stock}</small></div>`).join('') || '<p>Sin resultados</p>';
+}
+function escanear(){
+  const q=$('#busq').value.trim(); const p=S.productos.find(p=>p.codigo===q);
+  if(p){ addCarrito(p.id); $('#busq').value=''; listaProd(); }
+}
+function addCarrito(id){
+  const p=S.productos.find(p=>p.id===id); const it=carrito.find(i=>i.id===id);
+  const cant=it?it.cant:0; if(cant+1>p.stock){alert('Stock insuficiente');return;}
+  it?it.cant++:carrito.push({id,cant:1}); pintarCarrito();
+}
+function cambiar(id,d){
+  const it=carrito.find(i=>i.id===id), p=S.productos.find(p=>p.id===id);
+  it.cant+=d; if(it.cant>p.stock){it.cant=p.stock;alert('Stock insuficiente');}
+  if(it.cant<=0) carrito=carrito.filter(i=>i.id!==id); pintarCarrito();
+}
+function calc(){
+  const sub=carrito.reduce((a,i)=>a+S.productos.find(p=>p.id===i.id).precio*i.cant,0);
+  const imp=sub*S.config.impuesto/100; return {sub,imp,total:sub+imp};
+}
+function pintarCarrito(){
+  const t=calc();
+  $('#cart').innerHTML = `<h3>Carrito</h3>
+  <table>${carrito.map(i=>{const p=S.productos.find(p=>p.id===i.id);return `<tr><td>${p.nombre}</td>
+    <td class="qty"><button onclick="cambiar(${i.id},-1)">−</button> ${i.cant} <button onclick="cambiar(${i.id},1)">+</button></td>
+    <td>${m(p.precio*i.cant)}</td></tr>`}).join('') || '<tr><td>Vacío</td></tr>'}</table>
+  <div class="tot"><div><span>Subtotal</span><span>${m(t.sub)}</span></div>
+  <div><span>Impuesto (${S.config.impuesto}%)</span><span>${m(t.imp)}</span></div>
+  <div class="grande"><span>TOTAL</span><span>${m(t.total)}</span></div></div>
+  <div class="row" style="margin-top:12px"><select id="pago" style="flex:1"><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option></select>
+  <input id="recibido" type="number" step="0.01" placeholder="Recibido" style="width:110px"></div>
+  <div class="row" style="margin-top:12px"><button class="btn verde" style="flex:1" onclick="cobrar()">✅ Cobrar</button>
+  <button class="btn rojo" onclick="carrito=[];pintarCarrito()">Vaciar</button></div>`;
+}
+function cobrar(){
+  if(!carrito.length) return alert('El carrito está vacío');
+  const t=calc(), pago=$('#pago').value; let cambio=0;
+  if(pago==='Efectivo'){
+    const rec=parseFloat($('#recibido').value);
+    if(isNaN(rec)||rec<t.total) return alert('El monto recibido es menor al total');
+    cambio=rec-t.total;
+  }
+  const caja=S.cajas.find(c=>c.id===S.config.cajaActual);
+  const venta={id:S.sigId.venta++,fecha:Date.now(),cajaId:caja.id,cajero:caja.cajero,pago,
+    items:carrito.map(i=>{const p=S.productos.find(p=>p.id===i.id);return {nombre:p.nombre,precio:p.precio,cant:i.cant}}),
+    subtotal:t.sub,impuesto:t.imp,total:t.total,cambio};
+  carrito.forEach(i=>{S.productos.find(p=>p.id===i.id).stock-=i.cant});
+  S.ventas.push(venta); guardar(); carrito=[];
+  vPOS();
+  aviso(cambio>0 ? 'Venta registrada · Cambio: '+m(cambio) : 'Venta registrada ✅');
+  imprimir(venta);
+}
+function aviso(texto){
+  const t = document.createElement('div');
+  t.textContent = texto;
+  t.style.cssText = 'position:fixed;top:20px;right:20px;background:#16a34a;color:#fff;padding:14px 20px;border-radius:10px;font-size:16px;font-weight:700;z-index:9999;box-shadow:0 4px 14px #0004';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 6000);
+}
+function imprimir(v){
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    @page{size:80mm auto;margin:0}
+    body{font-family:monospace;font-size:12px;width:72mm;margin:0;padding:4mm}
+    hr{border:0;border-top:1px dashed #000}
+  </style></head><body>
+  <center><b>${S.config.tienda}</b><br>Recibo #${v.id}<br>${fecha(v.fecha)}<br>Cajero: ${v.cajero}</center><hr>
+  ${v.items.map(i=>`${i.cant} x ${i.nombre}<br>&nbsp;&nbsp;&nbsp;${m(i.precio*i.cant)}`).join('<br>')}<hr>
+  Subtotal: ${m(v.subtotal)}<br>Impuesto: ${m(v.impuesto)}<br><b>TOTAL: ${m(v.total)}</b><br>
+  Pago: ${v.pago}${v.cambio?'<br>Cambio: '+m(v.cambio):''}<hr>
+  <center>¡Gracias por su compra!</center></body></html>`;
+  let f = document.getElementById('printFrame');
+  if(!f){
+    f = document.createElement('iframe');
+    f.id = 'printFrame';
+    f.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0';
+    document.body.appendChild(f);
+  }
+  f.onload = () => { f.contentWindow.focus(); f.contentWindow.print(); };
+  f.srcdoc = html;
+}
+
+// ============ PRODUCTOS ============
+function vProductos(){
+  $('#app').innerHTML = `<h2>Productos</h2>
+  <div class="card row"><input id="pc" placeholder="Código"><input id="pn" placeholder="Nombre"><input id="pp" type="number" step="0.01" placeholder="Precio"><input id="ps" type="number" placeholder="Stock">
+  <button class="btn" onclick="addProd()">+ Agregar</button></div>
+  <div class="card"><table><tr><th>Código</th><th>Nombre</th><th>Precio</th><th>Stock</th><th></th></tr>
+  ${S.productos.map(p=>`<tr><td>${p.codigo}</td><td>${p.nombre}</td><td>${m(p.precio)}</td><td>${p.stock}</td>
+  <td><button class="btn gris" onclick="editProd(${p.id})">✏️</button> <button class="btn rojo" onclick="delProd(${p.id})">🗑</button></td></tr>`).join('')}</table></div>`;
+}
+function addProd(){
+  const c=$('#pc').value.trim(),n=$('#pn').value.trim(),pr=parseFloat($('#pp').value),st=parseInt($('#ps').value);
+  if(!c||!n||isNaN(pr)||isNaN(st)) return alert('Completa todos los campos');
+  if(S.productos.some(p=>p.codigo===c)) return alert('Ese código ya existe');
+  S.productos.push({id:S.sigId.prod++,codigo:c,nombre:n,precio:pr,stock:st}); guardar(); vProductos();
+}
+function editProd(id){
+  const p=S.productos.find(p=>p.id===id);
+  const n=prompt('Nombre:',p.nombre); if(n===null)return;
+  const pr=parseFloat(prompt('Precio:',p.precio)); const st=parseInt(prompt('Stock:',p.stock));
+  if(n)p.nombre=n; if(!isNaN(pr))p.precio=pr; if(!isNaN(st))p.stock=st; guardar(); vProductos();
+}
+function delProd(id){ if(confirm('¿Eliminar producto?')){S.productos=S.productos.filter(p=>p.id!==id);guardar();vProductos();} }
+
+// ============ VENTAS ============
+function vVentas(){
+  const vs=[...S.ventas].reverse();
+  $('#app').innerHTML = `<h2>Historial de ventas</h2><div class="card"><table>
+  <tr><th>#</th><th>Fecha</th><th>Caja/Cajero</th><th>Pago</th><th>Total</th><th></th></tr>
+  ${vs.map(v=>`<tr><td>${v.id}</td><td>${fecha(v.fecha)}</td><td>${(S.cajas.find(c=>c.id===v.cajaId)||{}).nombre||'-'} / ${v.cajero}</td><td>${v.pago}</td><td><b>${m(v.total)}</b></td>
+  <td><button class="btn gris" onclick="imprimir(S.ventas.find(x=>x.id===${v.id}))">🖨</button></td></tr>`).join('')||'<tr><td colspan="6">Aún no hay ventas</td></tr>'}</table></div>`;
+}
+
+// ============ CONFIG ============
+function vConfig(){
+  $('#app').innerHTML = `<h2>Configuración</h2><div class="card row" style="flex-direction:column;max-width:380px">
+  <label>Nombre de la tienda<input id="ct" value="${S.config.tienda}" style="width:100%"></label>
+  <label>Impuesto (%)<input id="ci" type="number" value="${S.config.impuesto}" style="width:100%"></label>
+  <label>Símbolo de moneda<input id="cm" value="${S.config.moneda}" style="width:100%"></label>
+  <button class="btn" onclick="saveConf()">Guardar</button>
+  <button class="btn rojo" onclick="if(confirm('Se borrarán TODOS los datos. ¿Continuar?')){localStorage.removeItem(KEY);location.reload()}">Borrar todos los datos</button></div>`;
+}
+function saveConf(){
+  S.config.tienda=$('#ct').value; S.config.impuesto=parseFloat($('#ci').value)||0; S.config.moneda=$('#cm').value||'$';
+  guardar(); alert('Guardado');
+}
+
+// ============ CUENTAS / LOGIN ============
+const UKEY = 'mi_pos_users', SKEY = 'mi_pos_sesion';
+const usuarios = () => JSON.parse(localStorage.getItem(UKEY)) || [];
+
+async function hash(t){
+  try{
+    const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+    return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join('');
+  }catch(e){ return btoa(unescape(encodeURIComponent(t))); }
+}
+
+function iniciar(){
+  const ses = localStorage.getItem(SKEY) || sessionStorage.getItem(SKEY);
+  if(ses && usuarios().some(u => u.usuario === ses)) entrar(ses);
+  else pantallaAuth(usuarios().length ? 'login' : 'registro');
+}
+
+function pantallaAuth(modo){
+  let a = $('#auth');
+  if(!a){ a = document.createElement('div'); a.id = 'auth'; document.body.appendChild(a); }
+  const reg = modo === 'registro';
+  a.innerHTML = `<div class="authbox">
+    <h1>🛒 Mi POS</h1>
+    <p>${reg ? 'Crea tu cuenta' : '¡Bienvenido de vuelta! Inicia sesión'}</p>
+    ${reg ? '<input id="a_tienda" placeholder="Nombre de tu tienda">' : ''}
+    <input id="a_user" placeholder="Usuario" autocomplete="username">
+    <input id="a_pass" type="password" placeholder="Contraseña" autocomplete="${reg ? 'new-password' : 'current-password'}">
+    ${reg ? '<input id="a_pass2" type="password" placeholder="Repetir contraseña">'
+          : '<label class="rec"><input type="checkbox" id="a_rec"> Recordar sesión</label>'}
+    <div id="a_err" class="err"></div>
+    <button class="btn" onclick="${reg ? 'registrar()' : 'login()'}">${reg ? 'Crear cuenta' : 'Entrar a mi oficina'}</button>
+    <p>${reg ? '¿Ya tienes cuenta? <a href="#" onclick="pantallaAuth(\'login\');return false">Inicia sesión</a>'
+             : '¿No tienes una cuenta? <a href="#" onclick="pantallaAuth(\'registro\');return false">Crear cuenta</a>'}</p>
+  </div>`;
+  a.querySelectorAll('input').forEach(i => i.onkeydown = e => { if(e.key === 'Enter') reg ? registrar() : login(); });
+  $('#a_user').focus();
+}
+
+async function registrar(){
+  const err = x => $('#a_err').textContent = x;
+  const t = $('#a_tienda').value.trim(), u = $('#a_user').value.trim().toLowerCase();
+  const p = $('#a_pass').value, p2 = $('#a_pass2').value;
+  if(!t || !u || !p) return err('Completa todos los campos');
+  if(u.length < 3) return err('El usuario debe tener al menos 3 caracteres');
+  if(p.length < 6) return err('La contraseña debe tener al menos 6 caracteres');
+  if(p !== p2) return err('Las contraseñas no coinciden');
+  const us = usuarios();
+  if(us.some(x => x.usuario === u)) return err('Ese usuario ya existe');
+  us.push({usuario: u, clave: await hash(p), creado: Date.now()});
+  localStorage.setItem(UKEY, JSON.stringify(us));
+  if(us.length === 1){ S.config.tienda = t; guardar(); }
+  sessionStorage.setItem(SKEY, u);
+  entrar(u);
+}
+
+async function login(){
+  const u = $('#a_user').value.trim().toLowerCase(), p = $('#a_pass').value;
+  const x = usuarios().find(x => x.usuario === u);
+  if(!x || x.clave !== await hash(p)) return $('#a_err').textContent = 'Usuario o contraseña incorrectos';
+  ($('#a_rec').checked ? localStorage : sessionStorage).setItem(SKEY, u);
+  entrar(u);
+}
+
+function entrar(u){
+  const a = $('#auth'); if(a) a.remove();
+  let box = $('#usr');
+  if(!box){ box = document.createElement('div'); box.id = 'usr'; $('aside').appendChild(box); }
+  box.innerHTML = '';
+  const n = document.createElement('div'); n.textContent = '👤 ' + u;
+  const b = document.createElement('button'); b.textContent = '🚪 Cerrar sesión'; b.onclick = salir;
+  box.append(n, b);
+  render();
+}
+
+function salir(){
+  localStorage.removeItem(SKEY); sessionStorage.removeItem(SKEY);
+  pantallaAuth('login');
+}
+
+iniciar();
+</script>
+</body>
+</html>

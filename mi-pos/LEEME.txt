@@ -1,0 +1,16 @@
+MI POS - Punto de Venta
+=======================
+
+CÓMO ABRIRLO EN VISUAL STUDIO CODE
+1. Descomprime este zip.
+2. En VS Code: Archivo > Abrir carpeta > elige la carpeta "mi-pos".
+3. Instala la extensión "Live Server" (Ritwick Dey).
+4. Clic derecho en index.html > "Open with Live Server".
+   (También puedes abrir index.html directamente en el navegador.)
+
+PRIMER USO
+- Aparece "Crear cuenta": escribe tu tienda, usuario y contraseña.
+- Cajas > Abrir caja > Punto de venta para vender.
+
+NOTA
+Los datos se guardan en el navegador de cada computadora (localStorage).
